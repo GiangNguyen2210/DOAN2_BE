@@ -1,28 +1,65 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, UploadFile, File
 from sqlalchemy.orm import Session
 from ..database import get_db
 from ..models import History
 from datetime import datetime
-from ..schemas.history import HistoryCreate, HistoryResponse
-from sqlalchemy import func, cast, Date
-
-
+from sqlalchemy import cast, Date
+import os
 
 router = APIRouter(
     prefix="/history",
     tags=["History"],
 )
 
+# ============================================================
+# 📌 Upload folder setup
+# ============================================================
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))     # /app/routers
+ROOT_DIR = os.path.dirname(BASE_DIR)                      # /app
+UPLOAD_DIR = os.path.join(ROOT_DIR, "uploads")            # /app/uploads
+
+if not os.path.exists(UPLOAD_DIR):
+    os.makedirs(UPLOAD_DIR)
+
+PUBLIC_HOST = "http://127.0.0.1:8000"   # change later if needed
+
+
+# ============================================================
+# 📌 1. Upload Image -> Save file -> Return ABS PATH + URL
+# ============================================================
+@router.post("/upload")
+async def upload_image(file: UploadFile = File(...)):
+    # generate unique file name
+    timestamp = datetime.utcnow().strftime("%Y%m%d%H%M%S%f")
+    ext = file.filename.split(".")[-1]
+    filename = f"history_{timestamp}.{ext}"
+
+    abs_path = os.path.join(UPLOAD_DIR, filename)
+
+    # save file to uploads folder
+    with open(abs_path, "wb") as f:
+        f.write(await file.read())
+
+    # full URL for frontend
+    public_url = f"{PUBLIC_HOST}/uploads/{filename}"
+
+    return {
+        "success": True,
+        "image_url": public_url,     # URL for FE
+        "absolute_path": abs_path    # FULL path stored on disk
+    }
+
+
+# ============================================================
+# 📌 2. Create History (your original API)
+# ============================================================
 @router.post("/")
-def create_history(
-    data: HistoryCreate,
-    db: Session = Depends(get_db)
-):
+def create_history(data: dict, db: Session = Depends(get_db)):
     history = History(
-        ImageUrl = data.image_url,
-        CreatedDate = datetime.utcnow(),
-        UID = data.uid,
-        Status = data.status
+        ImageUrl=data["image_url"],
+        CreatedDate=datetime.utcnow(),
+        UID=data["uid"],
+        Status=data["status"]
     )
 
     db.add(history)
@@ -40,9 +77,13 @@ def create_history(
         }
     }
 
+
+# ============================================================
+# 📌 3. Grouped by Date (original API)
+# ============================================================
 @router.get("/grouped-by-date")
 def get_history_grouped_by_date(db: Session = Depends(get_db)):
-    # Query all records ordered by newest first
+
     rows = (
         db.query(
             cast(History.CreatedDate, Date).label("date"),
@@ -55,10 +96,11 @@ def get_history_grouped_by_date(db: Session = Depends(get_db)):
     grouped = {}
 
     for date_value, record in rows:
-        date_str = date_value.isoformat()  # convert to "YYYY-MM-DD"
+        date_str = date_value.isoformat()
+
         if date_str not in grouped:
             grouped[date_str] = []
-        
+
         grouped[date_str].append({
             "HistoryId": record.HistoryId,
             "ImageUrl": record.ImageUrl,

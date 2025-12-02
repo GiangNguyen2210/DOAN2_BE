@@ -186,3 +186,40 @@ pyvenv.cfg
 pip-selfcheck.json
 
 # End of https://www.toptal.com/developers/gitignore/api/python,venv
+# Ignore uploaded images
+app/uploads/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pdb
+*.egg-info/
+
+# Virtual environment
+venv/
+env/
+.venv/
+
+# IDE files
+.vscode/
+.idea/
+
+# Environment variables
+.env
+
+# SQLite or SQL files (if any)
+*.db
+*.sqlite3
+
+# Alembic migration artifacts
+alembic/versions/*.pyc
+alembic/versions/__pycache__/
+
+# Uploaded files (FastAPI static files)
+app/uploads/
+
+# Logs
+*.log
+logs/
